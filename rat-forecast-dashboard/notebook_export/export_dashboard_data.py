@@ -7,9 +7,10 @@
 #   (the ARIMA(0,0,1) 4-week forecast cell), and run it.
 #
 #   It only needs `balanced_weekly_df` from the "Group by" section, so it can
-#   also run any time after that cell. It does NOT change the modeling: it
-#   re-uses the notebook's best model, ARIMA(0,0,1), fit on the full weekly
-#   "Rat Sighting" series exactly like the 4-week forecast cell.
+#   also run at the very end of the notebook. It does NOT change the modeling:
+#   for each area it refits the model that won that area's comparison (see
+#   AREA_MODELS below) on the full weekly "Rat Sighting" series, the same way
+#   the notebook's 4-week forecast cells do.
 #
 # WHAT IT WRITES (download both and drop them into rat-forecast-dashboard/data/)
 #   forecast_data.js  -> window.RAT_FORECAST  (history, forecasts, thresholds,
@@ -26,8 +27,19 @@ import numpy as np
 import pandas as pd
 import requests
 from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-BEST_ORDER = (0, 0, 1)   # winner of the model comparison table (lowest MAE)
+# Best model per area, from the notebook's model comparison for each area.
+# ("ARIMA", (p, d, q)) or ("SES", None) for Simple Exponential Smoothing.
+# If a comparison is re-run and a different model wins, change it here.
+AREA_MODELS = {
+    "CITYWIDE":      ("ARIMA", (0, 0, 1)),
+    "BROOKLYN":      ("ARIMA", (0, 0, 1)),
+    "MANHATTAN":     ("ARIMA", (1, 0, 1)),
+    "QUEENS":        ("ARIMA", (1, 0, 0)),
+    "BRONX":         ("SES", None),
+    "STATEN ISLAND": ("ARIMA", (0, 1, 0)),
+}
 TARGET = "Rat Sighting"  # same target column the notebook models
 HORIZON = 4              # 1-4 weeks ahead
 HISTORY_WEEKS = 26       # recent weeks shown on the dashboard trend chart
@@ -40,19 +52,36 @@ GEOJSON_URL = (
 )
 
 
-def forecast_area(series):
-    """Fit the notebook's best model on one weekly series and forecast 1-4 weeks."""
+def model_label(kind, order):
+    return "Simple Exponential Smoothing" if kind == "SES" else f"ARIMA{order}"
+
+
+def forecast_area(series, kind, order):
+    """Fit one area's best model on its weekly series and forecast 1-4 weeks."""
     series = series.asfreq("W-SUN")
-    fit = ARIMA(series, order=BEST_ORDER).fit()
-    res = fit.get_forecast(steps=HORIZON)
-    mean = res.predicted_mean.clip(lower=0)          # complaints cannot be negative
-    ci = res.conf_int(alpha=0.05).clip(lower=0)      # 95% CI, same as the notebook
+    if kind == "SES":
+        # Same call as the notebook's SES cell (no trend, no seasonality)
+        fit = ExponentialSmoothing(series, trend=None, seasonal=None).fit()
+        mean = np.asarray(fit.forecast(steps=HORIZON))
+        # Holt-Winters results have no built-in intervals, so use the standard
+        # SES formula: the h-step variance is sigma^2 * (1 + (h-1) * alpha^2)
+        alpha = fit.params["smoothing_level"]
+        sigma = np.sqrt(fit.sse / len(series))
+        half = 1.96 * sigma * np.sqrt(1 + np.arange(HORIZON) * alpha ** 2)
+        lower, upper = mean - half, mean + half
+    else:
+        res = ARIMA(series, order=order).fit().get_forecast(steps=HORIZON)
+        mean = np.asarray(res.predicted_mean)
+        ci = np.asarray(res.conf_int(alpha=0.05))  # 95% CI, same as the notebook
+        lower, upper = ci[:, 0], ci[:, 1]
+    # complaints cannot be negative
+    mean, lower, upper = (np.clip(a, 0, None) for a in (mean, lower, upper))
     return [
         {
             "h": h + 1,
-            "mean": round(float(mean.iloc[h]), 1),
-            "lower": round(float(ci.iloc[h, 0]), 1),
-            "upper": round(float(ci.iloc[h, 1]), 1),
+            "mean": round(float(mean[h]), 1),
+            "lower": round(float(lower[h]), 1),
+            "upper": round(float(upper[h]), 1),
         }
         for h in range(HORIZON)
     ]
@@ -80,14 +109,16 @@ def activity_thresholds(series):
 
 
 def build_area(area_id, name, series):
+    kind, order = AREA_MODELS[area_id]
     return {
         "id": area_id,
         "name": name,
+        "model": model_label(kind, order),
         "history": [
             {"week": d.strftime("%Y-%m-%d"), "value": int(v)}
             for d, v in series.tail(HISTORY_WEEKS).items()
         ],
-        "forecast": forecast_area(series),
+        "forecast": forecast_area(series, kind, order),
         "thresholds": activity_thresholds(series),
     }
 
@@ -146,7 +177,7 @@ def export_dashboard_data(balanced_weekly_df, source="notebook",
         "meta": {
             "source": source,
             "generated": pd.Timestamp.now().strftime("%Y-%m-%d"),
-            "model": f"ARIMA{BEST_ORDER}",
+            "model": "Best model per area",
             "target": TARGET,
             "last_observed_week": last_week.strftime("%Y-%m-%d"),
             "threshold_weeks": THRESHOLD_WEEKS,
@@ -192,7 +223,7 @@ def export_dashboard_data(balanced_weekly_df, source="notebook",
           f"forecast weeks {forecast_weeks[0]['week_start']} to {forecast_weeks[-1]['week_start']}")
     print(f"Wrote {out_geo}: {len(features)} ZIP boundaries")
     for a in areas:
-        print(f"  {a['name']:<14} " + "  ".join(f"h{f['h']}={f['mean']:.1f}" for f in a["forecast"]))
+        print(f"  {a['name']:<14} {a['model']:<29} " + "  ".join(f"h{f['h']}={f['mean']:.1f}" for f in a["forecast"]))
     return data
 
 

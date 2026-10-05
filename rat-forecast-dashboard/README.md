@@ -46,7 +46,7 @@ weeks 2–4).
 | Piece | Source of truth | What the dashboard does |
 |---|---|---|
 | Areas | `Borough` column (5 boroughs after imputation) | Citywide + the 5 boroughs |
-| Model | Comparison table → **ARIMA(0,0,1)** (lowest MAE), which is the model used in the 4-week forecast cell | Same model and the same `get_forecast(4)` with a 95% CI. Citywide is identical to the notebook. Each borough series is fit with the same model. |
+| Model | Each area's own model comparison: Citywide and Brooklyn **ARIMA(0,0,1)**, Manhattan **ARIMA(1,0,1)**, Queens **ARIMA(1,0,0)**, Bronx **Simple Exponential Smoothing**, Staten Island **ARIMA(0,1,0)** | `AREA_MODELS` in the export refits each winner on the full series with a 4-week forecast and 95% interval (SES interval from the standard SES variance formula) |
 | History | `balanced_weekly_df` weekly `Rat Sighting` totals (Sunday-start weeks) | Last 26 weeks on the chart |
 | Heatmap | The supplied `px.choropleth_map`: ZIP level, `Incident Zip` ↔ `properties.ZCTA5CE10`, OpenDataDE NY GeoJSON, 5-step teal→blue scale, `carto-positron`, opacity 0.8 | The same setup in Plotly.js (`choroplethmap`). Only the color values change: they are **forecasted** sightings per ZIP for the selected week, not historical totals. |
 
@@ -63,9 +63,7 @@ is in between. That makes the label mean "relative to this area's usual level," 
 Staten Island isn't permanently Low. The cutoffs are drawn as dotted lines on the
 chart.
 
-**Weeks 2–4 are identical.** This is a property of the chosen MA(1) model: it uses
-only last week's shock, so after one step it reverts to the long-run mean. The
-dashboard says this in its method notes instead of hiding it.
+**Why some forecasts are flat.** This comes from the models, not the dashboard. ARIMA(0,0,1) adjusts only week 1 and then holds at the long-run average. SES and ARIMA(0,1,0) give one value for all four weeks. ARIMA(1,0,0) and ARIMA(1,0,1) drift gradually toward the average.
 
 ## Regenerating the placeholder data
 
