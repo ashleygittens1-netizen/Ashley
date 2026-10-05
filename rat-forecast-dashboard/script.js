@@ -237,7 +237,7 @@ function renderChart(area) {
   };
 
   Plotly.react("trendChart", traces, layout, { displayModeBar: false, responsive: true });
-  $("chartSub").textContent = `${area.name} · last ${hist.length} weeks observed + 4-week forecast`;
+  $("chartSub").textContent = `${area.name} · ${modelOf(area)} · last ${hist.length} weeks observed + 4-week forecast`;
 }
 
 function renderMap(areaChanged) {
@@ -292,11 +292,15 @@ function renderMap(areaChanged) {
     `Highest expected: ZIP <b>${zips[best]}</b> · ${fmtNum(values[best], 1)} sightings`;
 }
 
+// Each area's model comes from the export; older data files only have meta.model.
+const modelOf = (area) => area.model || DATA.meta.model;
+
 function renderMethod() {
   const m = DATA.meta;
+  const models = DATA.areas.map((a) => `${a.name} <code>${modelOf(a)}</code>`).join(", ");
   const items = [
-    `Model: <code>${m.model}</code> on weekly "${m.target}" counts — the best performer (lowest MAE) in the notebook's model comparison. Fit separately for citywide and each borough on all complete weeks through ${fmtDay(m.last_observed_week, { year: "numeric" })}.`,
-    `An MA(1) model only carries information one week forward, so forecasts for weeks 2–4 settle at the series' long-run mean and look identical.`,
+    `Models: each area uses the model that won its own comparison in the notebook (${models}), fit on weekly "${m.target}" counts through ${fmtDay(m.last_observed_week, { year: "numeric" })}.`,
+    `How far the forecast moves depends on the model. ARIMA(0,0,1) adjusts only week 1, then holds at the long-run average. Simple Exponential Smoothing and ARIMA(0,1,0) give one flat value for all four weeks. ARIMA(1,0,0) and ARIMA(1,0,1) drift gradually toward the long-run average.`,
     `Activity level: Low below the 33rd percentile, High above the 67th percentile of the area's own weekly counts over the last ${m.threshold_weeks} weeks; Moderate in between.`,
     `Heatmap: each borough's forecast is split across its ZIP codes by their share of that borough's rat sightings over the last ${m.share_weeks} weeks. Boundaries and colors follow the original ZIP heatmap code.`,
   ];
