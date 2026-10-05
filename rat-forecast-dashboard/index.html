@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NYC Rat Activity Forecast</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page">
+
+    <!-- ===== Header ===== -->
+    <header class="masthead">
+      <p class="eyebrow">NYC 311 &middot; Rodent complaints &middot; Weekly rat sightings</p>
+      <h1>NYC Rat Activity Forecast</h1>
+      <p class="subtitle">Explore recent complaint trends and expected rat activity over the next four weeks.</p>
+      <p class="demo-flag" id="demoFlag" hidden>
+        Preview data &mdash; run the export cell in the Colab notebook and replace
+        <code>data/forecast_data.js</code> to show the real forecasts.
+      </p>
+    </header>
+
+    <!-- ===== Controls ===== -->
+    <section class="controls" aria-label="Forecast controls">
+      <label class="control">
+        <span class="control-label">Area</span>
+        <select id="areaSelect"></select>
+      </label>
+
+      <div class="control">
+        <span class="control-label" id="horizonLabel">Forecast horizon</span>
+        <div class="horizon" role="radiogroup" aria-labelledby="horizonLabel" id="horizonGroup">
+          <!-- Buttons are built in script.js (1-4 weeks ahead) -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Forecast overview ===== -->
+    <section class="overview" aria-live="polite">
+      <div class="stat">
+        <span class="stat-label">Expected complaints</span>
+        <span class="stat-value" id="expValue">&ndash;</span>
+        <span class="stat-note" id="expRange"></span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Activity level</span>
+        <span class="level" id="levelBadge" data-level="">
+          <span class="level-dot" aria-hidden="true"></span>
+          <span id="levelText">&ndash;</span>
+        </span>
+        <span class="stat-note" id="levelNote"></span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Forecast period</span>
+        <span class="stat-period" id="periodValue">&ndash;</span>
+        <span class="stat-note" id="periodNote"></span>
+      </div>
+    </section>
+
+    <!-- ===== Trend + forecast chart ===== -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Recent Activity &amp; Forecast</h2>
+        <p class="panel-sub" id="chartSub"></p>
+      </div>
+      <div class="chart-key" aria-hidden="true">
+        <span><i class="key-line"></i>Observed</span>
+        <span><i class="key-line key-dashed"></i>Forecast</span>
+        <span><i class="key-band"></i>95% interval</span>
+        <span><i class="key-rule"></i>Low / High cutoffs</span>
+      </div>
+      <div id="trendChart" class="chart"></div>
+    </section>
+
+    <!-- ===== Forecast heatmap ===== -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Forecast Heatmap</h2>
+        <p class="panel-sub" id="mapSub"></p>
+      </div>
+      <div id="forecastMap" class="map"></div>
+      <div class="map-foot">
+        <div class="legend">
+          <span class="legend-title">Expected rat sightings per ZIP, per week</span>
+          <div class="legend-bar"></div>
+          <div class="legend-scale"><span id="legendMin">0</span><span id="legendMax"></span></div>
+        </div>
+        <p class="map-hot" id="mapHot"></p>
+      </div>
+      <p class="note">Activity levels are based on forecasted complaint volume relative to historical patterns.</p>
+    </section>
+
+    <!-- ===== Method notes ===== -->
+    <footer class="method">
+      <h3>How these numbers are made</h3>
+      <ul id="methodList"></ul>
+    </footer>
+  </main>
+
+  <!-- Plotly: same library family as the notebook's px.choropleth_map heatmap -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+  <!-- Data exported from the Colab notebook (export_dashboard_data.py) -->
+  <script src="data/forecast_data.js"></script>
+  <script src="data/nyc_zip_geo.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
