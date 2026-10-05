@@ -42,7 +42,8 @@ function zipForecasts(h) {
 }
 
 // Fixed color range across all 4 horizons so switching weeks is comparable.
-const ZIP_MAX = Math.max(...Object.values(DATA.zips).flatMap((z) => z.forecast));
+// Set in INIT, after the data files have been checked.
+let ZIP_MAX = 0;
 
 /* --------------------------------------------------------------------------
    2. FORMATTING HELPERS
@@ -313,12 +314,30 @@ function render({ areaChanged = false } = {}) {
 /* --------------------------------------------------------------------------
    5. INIT
    -------------------------------------------------------------------------- */
-if (!DATA || !GEO || !window.Plotly) {
-  document.querySelector(".overview").insertAdjacentHTML(
-    "beforebegin",
-    `<p class="demo-flag">Could not load ${!window.Plotly ? "Plotly (check the internet connection)" : "data files in /data"}.</p>`
-  );
+/** Returns a message if a data file is missing or is the wrong file, else null. */
+function dataProblem() {
+  if (!window.Plotly) return "Could not load Plotly. Check the internet connection.";
+  if (!DATA || !Array.isArray(DATA.areas) || !DATA.zips) {
+    return "<code>data/forecast_data.js</code> does not contain the forecast data. " +
+      "It should start with <code>window.RAT_FORECAST =</code>" +
+      (GEO ? " (it looks like the map file, <code>nyc_zip_geo.js</code>, was saved under this name)." : ".") +
+      " Re-upload the <code>forecast_data.js</code> downloaded from the Colab export cell.";
+  }
+  if (!GEO || !Array.isArray(GEO.features)) {
+    return "<code>data/nyc_zip_geo.js</code> does not contain the ZIP boundaries. " +
+      "It should start with <code>window.NYC_ZIP_GEO =</code>.";
+  }
+  return null;
+}
+
+const problem = dataProblem();
+if (problem) {
+  const flag = document.createElement("p");
+  flag.className = "demo-flag";
+  flag.innerHTML = problem;
+  document.querySelector(".controls").before(flag);
 } else {
+  ZIP_MAX = Math.max(...Object.values(DATA.zips).flatMap((z) => z.forecast));
   buildControls();
   renderMethod();
   render({ areaChanged: true });
